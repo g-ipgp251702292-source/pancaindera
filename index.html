@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Head Tilting: Kata Adjektif Pancaindera</title>
+    
+    <!-- MediaPipe FaceMesh CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --primary-color: #FF6B6B;
+            --secondary-color: #4ECDC4;
+            --accent-color: #FFE66D;
+            --bg-color: #F7FFF7;
+            --text-color: #2C3E50;
+            --card-bg: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Fredoka', 'Comic Sans MS', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 15px;
+            overflow-x: hidden;
+        }
+
+        /* Screen Wrapper */
+        .screen {
+            display: none;
+            width: 100%;
+            max-width: 900px;
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 25px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            text-align: center;
+            border: 4px solid var(--secondary-color);
+            position: relative;
+        }
+
+        .active {
+            display: block;
+        }
+
+        h1 {
+            font-size: 2.3rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            text-shadow: 2px 2px #ffe2e2;
+        }
+
+        p {
+            font-size: 1.2rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        /* Pancaindera Icons Bar */
+        .icons-bar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            font-size: 2.2rem;
+            margin: 15px 0;
+        }
+
+        .icon-box {
+            background: #E8F8F5;
+            padding: 8px 15px;
+            border-radius: 16px;
+            border: 2px solid var(--secondary-color);
+        }
+
+        /* Buttons */
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 12px 35px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #d94343;
+            transition: all 0.2s ease;
+            margin-top: 15px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 #d94343;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #d94343;
+        }
+
+        /* Header Bar Info */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #FFF9E6;
+            padding: 12px 20px;
+            border-radius: 16px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: 2px solid var(--accent-color);
+        }
+
+        /* Question Box */
+        .question-card {
+            background-color: #EBF5FB;
+            border: 3px dashed #3498DB;
+            border-radius: 20px;
+            padding: 25px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 25px;
+            color: #1B4F72;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Options Grid */
+        .options-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .option-card {
+            background: #F2F4F4;
+            border: 4px solid #BDC3C7;
+            border-radius: 20px;
+            padding: 20px 10px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #34495E;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .option-card .direction-badge {
+            display: block;
+            font-size: 0.9rem;
+            color: #7F8C8D;
+            margin-top: 5px;
+        }
+
+        /* Tilt Indicators */
+        .option-card.selected {
+            background: var(--accent-color);
+            border-color: #F1C40F;
+            transform: scale(1.05);
+        }
+
+        .option-card.correct {
+            background: #2ECC71 !important;
+            color: white !important;
+            border-color: #27AE60 !important;
+        }
+
+        .option-card.wrong {
+            background: #E74C3C !important;
+            color: white !important;
+            border-color: #C0392B !important;
+        }
+
+        /* Feedback Area */
+        .feedback-box {
+            min-height: 60px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 12px;
+        }
+
+        .feedback-correct {
+            color: #27AE60;
+            background: #E8F8F5;
+        }
+
+        .feedback-wrong {
+            color: #C0392B;
+            background: #FDEDEC;
+        }
+
+        /* Camera & Tracking Status */
+        .camera-container {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            width: 140px;
+            height: 105px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 3px solid var(--secondary-color);
+            background: #000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror camera */
+        }
+
+        .head-status {
+            position: fixed;
+            bottom: 125px;
+            right: 15px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            z-index: 100;
+        }
+
+        .instructions-box {
+            background: #F4F6F7;
+            padding: 15px;
+            border-radius: 16px;
+            text-align: left;
+            margin: 15px 0;
+            font-size: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .options-container {
+                grid-template-columns: 1fr;
+            }
+            .question-card {
+                font-size: 1.3rem;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Skrin Utama (Start Screen) -->
+    <div id="start-screen" class="screen active">
+        <h1>Head Tilting:<br>Kata Adjektif Pancaindera</h1>
+        
+        <div class="icons-bar">
+            <div class="icon-box" title="Pandang">👁️</div>
+            <div class="icon-box" title="Dengar">👂</div>
+            <div class="icon-box" title="Bau">👃</div>
+            <div class="icon-box" title="Rasa">👅</div>
+            <div class="icon-box" title="Sentuh">✋</div>
+        </div>
+
+        <div class="instructions-box">
+            <p style="margin-bottom:8px; font-weight:bold; color:var(--primary-color);">Cara Bermain:</p>
+            <p>1. Baca ayat yang diberikan pada skrin.</p>
+            <p>2. <strong>Condongkan kepala</strong> ke arah jawapan pilihan anda (Kiri, Tengah, atau Kanan).</p>
+            <p>3. Jika kamera peranti tidak aktif, gunakan kekunci <strong>Anak Panah Kiri (⬅️)</strong>, <strong>Bawah (⬇️)</strong>, atau <strong>Kanan (➡️)</strong> pada papan kekunci.</p>
+        </div>
+
+        <p style="font-size: 1.1rem; color: #555;"><em>“Baca ayat, kemudian condongkan kepala ke arah jawapan yang betul!”</em></p>
+
+        <button class="btn" id="start-btn">MULA</button>
+    </div>
+
+    <!-- Skrin Permainan (Game Screen) -->
+    <div id="game-screen" class="screen">
+        <div class="game-header">
+            <span id="question-number">Soalan: 1/10</span>
+            <span id="score-display">Skor: 0/10</span>
+        </div>
+
+        <div id="question-text" class="question-card">
+            Memuatkan soalan...
+        </div>
+
+        <div class="options-container">
+            <div class="option-card" id="opt-left" onclick="makeSelection('left')">
+                <span id="text-left">-</span>
+                <span class="direction-badge">⬅️ Condong Kiri</span>
+            </div>
+            <div class="option-card" id="opt-center" onclick="makeSelection('center')">
+                <span id="text-center">-</span>
+                <span class="direction-badge">⬇️ Tegak / Bawah</span>
+            </div>
+            <div class="option-card" id="opt-right" onclick="makeSelection('right')">
+                <span id="text-right">-</span>
+                <span class="direction-badge">➡️ Condong Kanan</span>
+            </div>
+        </div>
+
+        <div id="feedback" class="feedback-box"></div>
+    </div>
+
+    <!-- Skrin Tamat (End Screen) -->
+    <div id="end-screen" class="screen">
+        <h1>Tahniah! Anda Telah Selesai Bermain.</h1>
+        
+        <div class="icons-bar">
+            <span>🎉</span><span>🌟</span><span>🏆</span>
+        </div>
+
+        <p id="final-score" style="font-size: 2rem; font-weight: bold; color: var(--primary-color); margin: 20px 0;">
+            Skor Akhir: 0/10
+        </p>
+
+        <p id="performance-message" style="font-size: 1.2rem; color: #555;"></p>
+
+        <button class="btn" id="restart-btn">MAIN SEMULA</button>
+    </div>
+
+    <!-- Camera Feed Widget -->
+    <div class="camera-container">
+        <video id="webcam" autoplay playsinline muted></video>
+    </div>
+    <div id="head-status" class="head-status">Kamera: Memuatkan...</div>
+
+    <script>
+        // Data Soalan Kata Adjektif Pancaindera (10 Soalan)
+        const questionsData = [
+            {
+                sentence: "Bunga ros di taman itu sangat ______, menyebabkan ramai orang suka menciumnya.",
+                sense: "Deria Bau 👃",
+                options: { left: "HARUM", center: "MASIN", right: "KASAR" },
+                correct: "left",
+                explanation: "'Harum' ialah kata adjektif pancaindera bau yang sesuai untuk bunga."
+            },
+            {
+                sentence: "Sup ayam yang dimasak oleh ibu rasanya agak ______ kerana kekurangan garam.",
+                sense: "Deria Rasa 👅",
+                options: { left: "BISING", center: "TAWAR", right: "LICIN" },
+                correct: "center",
+                explanation: "'Tawar' ialah kata adjektif pancaindera rasa untuk makanan yang tiada rasa masin/manis."
+            },
+            {
+                sentence: "Kain sutera yang dibeli dari kedai itu amat ______ apabila disentuh.",
+                sense: "Deria Sentuh ✋",
+                options: { left: "HAPAK", center: "INDAH", right: "LEMBUT" },
+                correct: "right",
+                explanation: "'Lembut' ialah kata adjektif pancaindera sentuh bagi permukaan kain sutera."
+            },
+            {
+                sentence: "Suara penyanyi wanita itu amat ______ semasa menyampaikan lagu tradisi.",
+                sense: "Deria Dengar 👂",
+                options: { left: "MERDU", center: "PAHIT", right: "BURUK" },
+                correct: "left",
+                explanation: "'Merdu' ialah kata adjektif pancaindera dengar untuk suara yang enak didengar."
+            },
+            {
+                sentence: "Pemandangan matahari terbit di puncak gunung itu kelihatan sangat ______.",
+                sense: "Deria Pandang 👁️",
+                options: { left: "TENGIK", center: "INDAH", right: "NYARING" },
+                correct: "center",
+                explanation: "'Indah' ialah kata adjektif pancaindera pandang bagi pemandangan yang elok."
+            },
+            {
+                sentence: "Adik tidak mahu minum ubat itu kerana rasanya yang amat ______.",
+                sense: "Deria Rasa 👅",
+                options: { left: "PAHIT", center: "KESAT", right: "WANGI" },
+                correct: "left",
+                explanation: "'Pahit' ialah kata adjektif pancaindera rasa untuk ubat."
+            },
+            {
+                sentence: "Bunyi siren kereta bomba itu sangat ______ sehingga mengejutkan penduduk tempatan.",
+                sense: "Deria Dengar 👂",
+                options: { left: "LAZAT", center: "NYARING", right: "KERA" },
+                correct: "center",
+                explanation: "'Nyaring' ialah kata adjektif pancaindera dengar bagi bunyi yang kuat dan bingit."
+            },
+            {
+                sentence: "Kasut sekolah yang ditinggalkan di dalam beg yang basah itu berbau ______.",
+                sense: "Deria Bau 👃",
+                options: { left: "CANTIK", center: "GARAU", right: "HAPAK" },
+                correct: "right",
+                explanation: "'Hapak' ialah kata adjektif pancaindera bau bagi barang yang lembap dan terperam."
+            },
+            {
+                sentence: "Batang pokok yang tua itu terasa ______ apabila diusap dengan tangan.",
+                sense: "Deria Sentuh ✋",
+                options: { left: "KASAR", center: "MANIS", right: "MERDU" },
+                correct: "left",
+                explanation: "'Kasar' ialah kata adjektif pancaindera sentuh bagi permukaan kulit pokok."
+            },
+            {
+                sentence: "Aiman membuang sampah yang sudah ______ itu ke dalam tong sampah di luar rumah.",
+                sense: "Deria Bau 👃",
+                options: { left: "HALUS", center: "BUSUK", right: "BISING" },
+                correct: "center",
+                explanation: "'Busuk' ialah kata adjektif pancaindera bau bagi bahan buangan/sampah."
+            }
+        ];
+
+        // Game State Variables
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let canAnswer = false;
+        let isCameraActive = false;
+        let currentTilt = "center"; // "left", "center", "right"
+        let tiltHoldTimer = null;
+        let lastHeadPosition = "center";
+
+        // DOM Elements
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const endScreen = document.getElementById('end-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const questionNumber = document.getElementById('question-number');
+        const scoreDisplay = document.getElementById('score-display');
+        const questionText = document.getElementById('question-text');
+        
+        const optLeft = document.getElementById('opt-left');
+        const optCenter = document.getElementById('opt-center');
+        const optRight = document.getElementById('opt-right');
+        const textLeft = document.getElementById('text-left');
+        const textCenter = document.getElementById('text-center');
+        const textRight = document.getElementById('text-right');
+
+        const feedbackBox = document.getElementById('feedback');
+        const finalScore = document.getElementById('final-score');
+        const performanceMessage = document.getElementById('performance-message');
+        const headStatus = document.getElementById('head-status');
+        const videoElement = document.getElementById('webcam');
+
+        // Audio Effects (Synthesized Web Audio API)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime); // A3
+                osc.frequency.setValueAtTime(185, audioCtx.currentTime + 0.15); // F#3
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.35);
+            }
+        }
+
+        // Initialize Game
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', restartGame);
+
+        function startGame() {
+            startScreen.classList.remove('active');
+            endScreen.classList.remove('active');
+            gameScreen.classList.add('active');
+
+            score = 0;
+            currentQuestionIndex = 0;
+            loadQuestion();
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function loadQuestion() {
+            canAnswer = true;
+            resetOptionStyles();
+            feedbackBox.className = 'feedback-box';
+            feedbackBox.innerHTML = '';
+
+            const q = questionsData[currentQuestionIndex];
+            questionNumber.textContent = `Soalan: ${currentQuestionIndex + 1}/${questionsData.length}`;
+            scoreDisplay.textContent = `Skor: ${score}/${questionsData.length}`;
+            
+            questionText.innerHTML = `<div><span style="font-size:1rem; color:#888; display:block; margin-bottom:5px;">[${q.sense}]</span>"${q.sentence}"</div>`;
+
+            textLeft.textContent = q.options.left;
+            textCenter.textContent = q.options.center;
+            textRight.textContent = q.options.right;
+        }
+
+        function resetOptionStyles() {
+            [optLeft, optCenter, optRight].forEach(opt => {
+                opt.className = 'option-card';
+            });
+        }
+
+        function highlightTiltOption(direction) {
+            if (!canAnswer) return;
+            resetOptionStyles();
+            if (direction === 'left') optLeft.classList.add('selected');
+            if (direction === 'center') optCenter.classList.add('selected');
+            if (direction === 'right') optRight.classList.add('selected');
+        }
+
+        function makeSelection(userChoice) {
+            if (!canAnswer) return;
+            canAnswer = false;
+
+            const q = questionsData[currentQuestionIndex];
+            resetOptionStyles();
+
+            const isCorrect = (userChoice === q.correct);
+
+            if (userChoice === 'left') optLeft.classList.add(isCorrect ? 'correct' : 'wrong');
+            if (userChoice === 'center') optCenter.classList.add(isCorrect ? 'correct' : 'wrong');
+            if (userChoice === 'right') optRight.classList.add(isCorrect ? 'correct' : 'wrong');
+
+            if (!isCorrect) {
+                // Highlight correct option as well
+                if (q.correct === 'left') optLeft.classList.add('correct');
+                if (q.correct === 'center') optCenter.classList.add('correct');
+                if (q.correct === 'right') optRight.classList.add('correct');
+            }
+
+            if (isCorrect) {
+                score++;
+                scoreDisplay.textContent = `Skor: ${score}/${questionsData.length}`;
+                feedbackBox.className = 'feedback-box feedback-correct';
+                feedbackBox.innerHTML = '🎉 Betul! Syabas!';
+                playSound('correct');
+            } else {
+                feedbackBox.className = 'feedback-box feedback-wrong';
+                feedbackBox.innerHTML = `❌ Cuba lagi!<br><span style="font-size:1rem; font-weight:normal;">${q.explanation}</span>`;
+                playSound('wrong');
+            }
+
+            setTimeout(() => {
+                currentQuestionIndex++;
+                if (currentQuestionIndex < questionsData.length) {
+                    loadQuestion();
+                } else {
+                    showEndScreen();
+                }
+            }, 2800);
+        }
+
+        function showEndScreen() {
+            gameScreen.classList.remove('active');
+            endScreen.classList.add('active');
+
+            finalScore.textContent = `Skor Akhir: ${score}/${questionsData.length}`;
+
+            if (score >= 8) {
+                performanceMessage.textContent = "Hebat sekali! Anda sangat menguasai Kata Adjektif Pancaindera! 🌟";
+            } else if (score >= 5) {
+                performanceMessage.textContent = "Bagus! Teruskan usaha anda untuk mendapat skor lebih tinggi. 👍";
+            } else {
+                performanceMessage.textContent = "Jangan putus asa! Mari cuba sekali lagi untuk lebih faham. 💪";
+            }
+        }
+
+        // --- Keyboard Alternative Control ---
+        document.addEventListener('keydown', (e) => {
+            if (!canAnswer) return;
+            if (e.key === 'ArrowLeft') {
+                highlightTiltOption('left');
+                makeSelection('left');
+            } else if (e.key === 'ArrowDown') {
+                highlightTiltOption('center');
+                makeSelection('center');
+            } else if (e.key === 'ArrowRight') {
+                highlightTiltOption('right');
+                makeSelection('right');
+            }
+        });
+
+        // --- MediaPipe FaceMesh & Camera Logic ---
+        function onResults(results) {
+            if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+                headStatus.textContent = "Kamera: Mencari Muka...";
+                return;
+            }
+
+            const landmarks = results.multiFaceLandmarks[0];
+            
+            // Key Nose Points for angle estimation
+            const noseTip = landmarks[1];
+            const leftEyeOuter = landmarks[33];
+            const rightEyeOuter = landmarks[263];
+
+            // Calculate eye tilt angle (Roll angle)
+            const deltaY = rightEyeOuter.y - leftEyeOuter.y;
+            const deltaX = rightEyeOuter.x - leftEyeOuter.x;
+            const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+            // Thresholds for head tilt detection
+            let detectedPos = "center";
+            if (angle > 12) {
+                detectedPos = "right";  // Mirroring effect
+            } else if (angle < -12) {
+                detectedPos = "left";   // Mirroring effect
+            } else {
+                detectedPos = "center";
+            }
+
+            headStatus.textContent = `Kepala: ${detectedPos.toUpperCase()}`;
+
+            if (canAnswer) {
+                highlightTiltOption(detectedPos);
+
+                // Dwell time: Must hold tilt position for 0.6 seconds to select
+                if (detectedPos !== "center" && detectedPos !== lastHeadPosition) {
+                    clearTimeout(tiltHoldTimer);
+                    lastHeadPosition = detectedPos;
+                    tiltHoldTimer = setTimeout(() => {
+                        if (canAnswer && lastHeadPosition === detectedPos) {
+                            makeSelection(detectedPos);
+                        }
+                    }, 600);
+                } else if (detectedPos === "center") {
+                    clearTimeout(tiltHoldTimer);
+                    lastHeadPosition = "center";
+                }
+            }
+        }
+
+        const faceMesh = new FaceMesh({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+
+        faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        faceMesh.onResults(onResults);
+
+        // Start Webcam Feed
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await faceMesh.send({ image: videoElement });
+            },
+            width: 320,
+            height: 240
+        });
+
+        camera.start().then(() => {
+            isCameraActive = true;
+            headStatus.textContent = "Kamera: Aktif";
+        }).catch((err) => {
+            console.warn("Kamera tidak ditemui/dibenarkan:", err);
+            headStatus.textContent = "Kamera: Gunakan Papan Kekunci (⬅️ ⬇️ ➡️)";
+        });
+
+    </script>
+</body>
+</html>
